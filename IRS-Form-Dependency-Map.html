@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IRS Form Dependency Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a working map on the left (layered left-to-right: source documents → worksheets → the return), a reading panel on the right that explains the selected form. */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --ink:#15191d; --muted:#5b636b; --rule:#d6dad4; --grid:#e1e4de;
+  --accent:#c22a26;   /* dropout-red, the ink of W-2 Copy A */
+  --up:#1f5ea6;       /* forms that feed the selection */
+  --edge:#a9b0aa; --tabtext:#ffffff;
+  --c-core:#232c38; --c-ind:#1d7468; --c-info:#2b5f9e; --c-biz:#a35e17; --c-pay:#6a4d9e; --c-intl:#5f6e16; --c-est:#963d6b; --c-adm:#6b727b;
+  --f-num:"Archivo Narrow","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111315; --surface:#1a1d20; --ink:#e6e8e4; --muted:#9ba2a8; --rule:#30353a; --grid:#1d2124;
+  --accent:#ff6f61; --up:#71aefc; --edge:#4c5359; --tabtext:#111315;
+  --c-core:#c9d3df; --c-ind:#5cc3b2; --c-info:#7fb0ec; --c-biz:#e9a35b; --c-pay:#b79cf0; --c-intl:#b8c95a; --c-est:#ea8fbd; --c-adm:#a7aeb6;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111315; --surface:#1a1d20; --ink:#e6e8e4; --muted:#9ba2a8; --rule:#30353a; --grid:#1d2124;
+  --accent:#ff6f61; --up:#71aefc; --edge:#4c5359; --tabtext:#111315;
+  --c-core:#c9d3df; --c-ind:#5cc3b2; --c-info:#7fb0ec; --c-biz:#e9a35b; --c-pay:#b79cf0; --c-intl:#b8c95a; --c-est:#ea8fbd; --c-adm:#a7aeb6;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;display:flex;flex-direction:column;min-height:100%}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (min-width:861px){html,body{height:100%}body{overflow:hidden}}
+
+header{padding-block:16px 10px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 24px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-num);font-weight:700;font-size:28px;line-height:1.05;margin:2px 0 0;letter-spacing:-.01em;text-wrap:balance}
+h1 b{color:var(--accent);font-weight:700}
+.stats{font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding-block:4px 12px}
+.search{position:relative;flex:1 1 240px;max-width:360px;min-width:0}
+.search input{width:100%;font:inherit;font-size:14px;padding:8px 10px 8px 32px;border:1px solid var(--rule);border-radius:6px;background:var(--surface);color:var(--ink)}
+.search input:focus{outline:2px solid var(--up);outline-offset:1px}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:var(--muted);fill:none}
+.results{position:absolute;z-index:20;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--rule);border-radius:6px;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px}
+.results button{display:flex;gap:10px;width:100%;text-align:left;background:none;border:0;padding:6px 8px;border-radius:4px;color:var(--ink);font:inherit;font-size:13px;cursor:pointer;align-items:baseline}
+.results button:hover,.results button.on{background:var(--grid)}
+.results .n{font-family:var(--f-num);font-weight:700;min-width:9ch;white-space:nowrap}
+.results .t{color:var(--muted);min-width:0}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;padding:4px 9px 4px 7px;border-radius:999px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);cursor:pointer}
+.chip i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.chip[aria-pressed="false"]{color:var(--muted);background:transparent;text-decoration:line-through}
+.chip[aria-pressed="false"] i{opacity:.35}
+.chip:focus-visible,.seg button:focus-visible,.zoom button:focus-visible,.link:focus-visible,.pick:focus-visible{outline:2px solid var(--up);outline-offset:2px}
+
+.ctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:12px;border:0;background:none;color:var(--muted);padding:5px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.tog{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--ink);cursor:pointer}
+.tog input{accent-color:var(--accent)}
+
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;padding-bottom:16px}
+.map{position:relative;min-height:0;min-width:0;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background-color:var(--surface);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px);background-size:100% 22px;touch-action:none;cursor:grab}
+.map.drag{cursor:grabbing}
+#svg{width:100%;height:100%;display:block;user-select:none;-webkit-user-select:none}
+.panel{min-height:0;overflow-y:auto;border:1px solid var(--rule);border-radius:8px;background:var(--surface);padding:18px 18px 22px}
+
+@media (max-width:860px){
+  main{grid-template-columns:1fr}
+  .map{height:62vh;min-height:380px}
+  .ctl{margin-left:0}
+}
+
+/* svg */
+.edge{fill:none;stroke:var(--edge);stroke-width:1.15;marker-end:url(#ar)}
+.edge.p{stroke-dasharray:4 3}
+.edge.up{stroke:var(--up);stroke-width:1.9;marker-end:url(#ar-up)}
+.edge.down{stroke:var(--accent);stroke-width:1.9;marker-end:url(#ar-down)}
+#ar path{fill:var(--edge)} #ar-up path{fill:var(--up)} #ar-down path{fill:var(--accent)}
+.node{cursor:pointer}
+.node .box{fill:var(--surface);stroke:var(--rule);stroke-width:1}
+.node:hover .box{stroke:var(--muted)}
+.node:focus{outline:none}
+.node:focus-visible .box{stroke:var(--up);stroke-width:2}
+.node .tab{fill:var(--c-core)}
+.node .kind{font-family:var(--f-mono);font-size:7.5px;letter-spacing:.06em;fill:var(--tabtext);opacity:.85}
+.node .num{font-family:var(--f-num);font-weight:700;font-size:14px;fill:var(--tabtext)}
+.node .ttl{font-family:var(--f-body);font-size:10.5px;fill:var(--ink)}
+.node.sel .box{stroke:var(--accent);stroke-width:2.5}
+.node.up .box{stroke:var(--up);stroke-width:1.6}
+.node.down .box{stroke:var(--accent);stroke-width:1.6}
+.has-sel .node:not(.sel):not(.up):not(.down){opacity:.28}
+.has-sel .edge:not(.up):not(.down){opacity:.14}
+.cat-core .tab{fill:var(--c-core)} .cat-ind .tab{fill:var(--c-ind)} .cat-info .tab{fill:var(--c-info)} .cat-biz .tab{fill:var(--c-biz)}
+.cat-pay .tab{fill:var(--c-pay)} .cat-intl .tab{fill:var(--c-intl)} .cat-est .tab{fill:var(--c-est)} .cat-adm .tab{fill:var(--c-adm)}
+.colhd{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;fill:var(--muted);text-transform:uppercase}
+
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--surface)}
+.zoom button{width:34px;height:32px;border:0;background:none;color:var(--ink);font:600 16px/1 var(--f-body);cursor:pointer}
+.zoom button+button{border-top:1px solid var(--rule)}
+.zoom button:hover{background:var(--grid)}
+.legend{position:absolute;left:10px;bottom:10px;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:7px 10px;font-size:11px;color:var(--muted);display:grid;gap:3px;max-width:calc(100% - 70px)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend svg{width:26px;height:8px;flex:none}
+.empty-map{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;pointer-events:none}
+
+/* panel */
+.p-kind{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.p-kind i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.p-num{font-family:var(--f-num);font-weight:700;font-size:40px;line-height:1;margin:6px 0 4px;letter-spacing:-.01em}
+.p-title{font-size:16px;font-weight:600;line-height:1.35;margin:0 0 10px;text-wrap:balance}
+.p-note{font-size:13px;color:var(--muted);margin:0 0 12px}
+.link{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--up);text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:1px}
+.p-sec{margin-top:20px}
+.p-sec h3{font-size:11px;font-family:var(--f-mono);font-weight:500;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px;display:flex;align-items:center;gap:8px;color:var(--muted)}
+.p-sec h3 em{font-style:normal;display:inline-block;width:14px;height:3px;border-radius:2px}
+.p-sec h3 .ct{margin-left:auto;font-variant-numeric:tabular-nums}
+.rel{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.rel button{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;width:100%;text-align:left;background:none;border:0;border-radius:5px;padding:6px 6px;color:var(--ink);font:inherit;cursor:pointer}
+.rel button:hover{background:var(--grid)}
+.rel .n{font-family:var(--f-num);font-weight:700;font-size:14px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.rel .n i{width:8px;height:8px;border-radius:2px}
+.rel .t{font-size:12.5px;color:var(--muted);min-width:0}
+.rel .why{grid-column:2;font-family:var(--f-mono);font-size:11.5px;color:var(--ink);line-height:1.4}
+.rel .why.p::before{content:"filing link · ";color:var(--muted)}
+.none{font-size:13px;color:var(--muted);margin:0}
+.picks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pick{font:inherit;font-size:12.5px;border:1px solid var(--rule);background:var(--bg);color:var(--ink);border-radius:5px;padding:5px 9px;cursor:pointer}
+.pick b{font-family:var(--f-num);font-size:14px}
+.intro h2{font-family:var(--f-num);font-size:22px;margin:0 0 8px}
+.intro p{margin:0 0 10px;max-width:60ch;font-size:13.5px}
+.src{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted)}
+.src p{margin:0 0 6px}
+@media (prefers-reduced-motion:no-preference){#vp{transition:none}}
+</style>
+</head>
+<body>
+
+<header class="gut">
+  <div>
+    <div class="eyebrow">Tax year 2025 forms · built from irs.gov Forms &amp; Instructions</div>
+    <h1>IRS Form <b>Dependency</b> Map</h1>
+  </div>
+  <div class="stats" id="stats"></div>
+</header>
+
+<div class="toolbar gut">
+  <div class="search">
+    <svg viewBox="0 0 16 16" stroke-width="1.8"><circle cx="7" cy="7" r="5"></circle><path d="M11 11l3.5 3.5"></path></svg>
+    <input id="q" type="search" placeholder="Find a form: 8949, Schedule C, K-1, 941…" autocomplete="off" aria-label="Find a form">
+    <div class="results" id="results" hidden></div>
+  </div>
+  <div class="chips" id="chips" aria-label="Show categories"></div>
+  <div class="ctl">
+    <div class="seg" role="group" aria-label="How far to trace">
+      <button id="m-direct" aria-pressed="false">Direct links</button>
+      <button id="m-full" aria-pressed="true">Full chain</button>
+    </div>
+    <label class="tog"><input type="checkbox" id="focus" checked> Only connected forms</label>
+  </div>
+</div>
+
+<main class="gut">
+  <div class="map" id="map">
+    <svg id="svg" aria-label="Dependency map of IRS forms">
+      <defs>
+        <marker id="ar" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z"></path></marker>
+        <marker id="ar-up" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z"></path></marker>
+        <marker id="ar-down" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z"></path></marker>
+      </defs>
+      <g id="vp"></g>
+    </svg>
+    <div class="empty-map" id="emptyMap" hidden>No forms in the categories you turned on.</div>
+    <div class="legend" aria-hidden="true">
+      <span><svg viewBox="0 0 26 8"><path d="M1 4H24" stroke="var(--up)" stroke-width="2"></path></svg>Feeds the selected form</span>
+      <span><svg viewBox="0 0 26 8"><path d="M1 4H24" stroke="var(--accent)" stroke-width="2"></path></svg>Selected form flows into</span>
+      <span><svg viewBox="0 0 26 8"><path d="M1 4H24" stroke="var(--muted)" stroke-width="1.4" stroke-dasharray="4 3"></path></svg>Filing link (no amount carried)</span>
+    </div>
+    <div class="zoom">
+      <button id="zin" aria-label="Zoom in">+</button>
+      <button id="zout" aria-label="Zoom out">−</button>
+      <button id="zfit" aria-label="Fit map to view" style="font-size:12px">Fit</button>
+    </div>
+  </div>
+  <aside class="panel" id="panel" aria-live="polite"></aside>
+</main>
+
+<script>
+/*PURE*/
+const CATS = {
+  core:{label:"Form 1040 & schedules"},
+  ind:{label:"Supporting forms & credits"},
+  info:{label:"Information returns"},
+  biz:{label:"Business entities"},
+  pay:{label:"Payroll"},
+  intl:{label:"International"},
+  est:{label:"Estates, gifts & exempt orgs"},
+  adm:{label:"Filing & procedural"}
+};
+const CAT_ORDER = Object.keys(CATS);
+
+// [id, number, parent form (for schedules), title, category]
+const NODES = [
+  // Form 1040 and its schedules
+  ["f1040","1040",null,"U.S. Individual Income Tax Return","core"],
+  ["f1040sr","1040-SR",null,"U.S. Tax Return for Seniors","core"],
+  ["s1","1","1040","Additional Income and Adjustments to Income","core"],
+  ["s1a","1-A","1040","Additional Deductions (tips, overtime, car loan interest, seniors)","core"],
+  ["s2","2","1040","Additional Taxes","core"],
+  ["s3","3","1040","Additional Credits and Payments","core"],
+  ["sA","A","1040","Itemized Deductions","core"],
+  ["sB","B","1040","Interest and Ordinary Dividends","core"],
+  ["sC","C","1040","Profit or Loss From Business (Sole Proprietorship)","core"],
+  ["sD","D","1040","Capital Gains and Losses","core"],
+  ["sE","E","1040","Supplemental Income and Loss","core"],
+  ["sEIC","EIC","1040","Earned Income Credit","core"],
+  ["sF","F","1040","Profit or Loss From Farming","core"],
+  ["sH","H","1040","Household Employment Taxes","core"],
+  ["sJ","J","1040","Income Averaging for Farmers and Fishermen","core"],
+  ["sR","R","1040","Credit for the Elderly or the Disabled","core"],
+  ["sSE","SE","1040","Self-Employment Tax","core"],
+  ["s8812","8812","1040","Credits for Qualifying Children and Other Dependents","core"],
+
+  // Supporting forms and credits
+  ["f8949","8949",null,"Sales and Other Dispositions of Capital Assets","ind"],
+  ["f4797","4797",null,"Sales of Business Property","ind"],
+  ["f6252","6252",null,"Installment Sale Income","ind"],
+  ["f8824","8824",null,"Like-Kind Exchanges","ind"],
+  ["f4684","4684",null,"Casualties and Thefts","ind"],
+  ["f6781","6781",null,"Gains and Losses From Section 1256 Contracts and Straddles","ind"],
+  ["f4562","4562",null,"Depreciation and Amortization","ind"],
+  ["f8829","8829",null,"Expenses for Business Use of Your Home","ind"],
+  ["f8582","8582",null,"Passive Activity Loss Limitations","ind"],
+  ["f6198","6198",null,"At-Risk Limitations","ind"],
+  ["f7203","7203",null,"S Corporation Shareholder Stock and Debt Basis Limitations","ind"],
+  ["f8995","8995",null,"Qualified Business Income Deduction Simplified Computation","ind"],
+  ["f8995a","8995-A",null,"Qualified Business Income Deduction","ind"],
+  ["f8960","8960",null,"Net Investment Income Tax","ind"],
+  ["f8959","8959",null,"Additional Medicare Tax","ind"],
+  ["f6251","6251",null,"Alternative Minimum Tax—Individuals","ind"],
+  ["f8801","8801",null,"Credit for Prior Year Minimum Tax","ind"],
+  ["f8962","8962",null,"Premium Tax Credit","ind"],
+  ["f8889","8889",null,"Health Savings Accounts (HSAs)","ind"],
+  ["f8853","8853",null,"Archer MSAs and Long-Term Care Insurance Contracts","ind"],
+  ["f8606","8606",null,"Nondeductible IRAs","ind"],
+  ["f5329","5329",null,"Additional Taxes on Qualified Plans (Including IRAs)","ind"],
+  ["f4972","4972",null,"Tax on Lump-Sum Distributions","ind"],
+  ["f8863","8863",null,"Education Credits","ind"],
+  ["f2441","2441",null,"Child and Dependent Care Expenses","ind"],
+  ["f8880","8880",null,"Credit for Qualified Retirement Savings Contributions","ind"],
+  ["f5695","5695",null,"Residential Energy Credits","ind"],
+  ["f8936","8936",null,"Clean Vehicle Credits","ind"],
+  ["f8911","8911",null,"Alternative Fuel Vehicle Refueling Property Credit","ind"],
+  ["f8839","8839",null,"Qualified Adoption Expenses","ind"],
+  ["f8615","8615",null,"Tax for Certain Children Who Have Unearned Income","ind"],
+  ["f8814","8814",null,"Parents' Election To Report Child's Interest and Dividends","ind"],
+  ["f4137","4137",null,"Social Security and Medicare Tax on Unreported Tip Income","ind"],
+  ["f8919","8919",null,"Uncollected Social Security and Medicare Tax on Wages","ind"],
+  ["f2106","2106",null,"Employee Business Expenses","ind"],
+  ["f3903","3903",null,"Moving Expenses","ind"],
+  ["f7206","7206",null,"Self-Employed Health Insurance Deduction","ind"],
+  ["f8283","8283",null,"Noncash Charitable Contributions","ind"],
+  ["f4952","4952",null,"Investment Interest Expense Deduction","ind"],
+  ["f8815","8815",null,"Exclusion of Interest From Series EE and I U.S. Savings Bonds","ind"],
+  ["f982","982",null,"Reduction of Tax Attributes Due to Discharge of Indebtedness","ind"],
+  ["f2210","2210",null,"Underpayment of Estimated Tax by Individuals, Estates, and Trusts","ind"],
+  ["f4136","4136",null,"Credit for Federal Tax Paid on Fuels","ind"],
+  ["f3800","3800",null,"General Business Credit","ind"],
+  ["f6765","6765",null,"Credit for Increasing Research Activities","ind"],
+  ["f5884","5884",null,"Work Opportunity Credit","ind"],
+  ["f8846","8846",null,"Credit for Employer Social Security and Medicare Taxes Paid on Certain Employee Tips","ind"],
+  ["f8826","8826",null,"Disabled Access Credit","ind"],
+  ["f8941","8941",null,"Credit for Small Employer Health Insurance Premiums","ind"],
+  ["f8994","8994",null,"Employer Credit for Paid Family and Medical Leave","ind"],
+
+  // Information returns and payee statements
+  ["w2","W-2",null,"Wage and Tax Statement","info"],
+  ["w2g","W-2G",null,"Certain Gambling Winnings","info"],
+  ["i1099int","1099-INT",null,"Interest Income","info"],
+  ["i1099oid","1099-OID",null,"Original Issue Discount","info"],
+  ["i1099div","1099-DIV",null,"Dividends and Distributions","info"],
+  ["i1099b","1099-B",null,"Proceeds From Broker and Barter Exchange Transactions","info"],
+  ["i1099da","1099-DA",null,"Digital Asset Proceeds From Broker Transactions","info"],
+  ["i1099s","1099-S",null,"Proceeds From Real Estate Transactions","info"],
+  ["i1099nec","1099-NEC",null,"Nonemployee Compensation","info"],
+  ["i1099misc","1099-MISC",null,"Miscellaneous Information","info"],
+  ["i1099k","1099-K",null,"Payment Card and Third Party Network Transactions","info"],
+  ["i1099r","1099-R",null,"Distributions From Pensions, Annuities, Retirement Plans, IRAs, Insurance Contracts","info"],
+  ["i1099g","1099-G",null,"Certain Government Payments","info"],
+  ["i1099sa","1099-SA",null,"Distributions From an HSA, Archer MSA, or Medicare Advantage MSA","info"],
+  ["i1099c","1099-C",null,"Cancellation of Debt","info"],
+  ["i1099q","1099-Q",null,"Payments From Qualified Education Programs","info"],
+  ["i1099patr","1099-PATR",null,"Taxable Distributions Received From Cooperatives","info"],
+  ["i1099ltc","1099-LTC",null,"Long-Term Care and Accelerated Death Benefits","info"],
+  ["ssa1099","SSA-1099",null,"Social Security Benefit Statement (issued by the Social Security Administration)","info"],
+  ["i1098","1098",null,"Mortgage Interest Statement","info"],
+  ["i1098e","1098-E",null,"Student Loan Interest Statement","info"],
+  ["i1098t","1098-T",null,"Tuition Statement","info"],
+  ["i1098c","1098-C",null,"Contributions of Motor Vehicles, Boats, and Airplanes","info"],
+  ["i5498","5498",null,"IRA Contribution Information","info"],
+  ["i5498sa","5498-SA",null,"HSA, Archer MSA, or Medicare Advantage MSA Information","info"],
+  ["i1095a","1095-A",null,"Health Insurance Marketplace Statement","info"],
+  ["i1095c","1095-C",null,"Employer-Provided Health Insurance Offer and Coverage","info"],
+  ["f2439","2439",null,"Notice to Shareholder of Undistributed Long-Term Capital Gains","info"],
+  ["k1_1065","K-1","1065","Partner's Share of Income, Deductions, Credits, etc.","info"],
+  ["k1_1120s","K-1","1120-S","Shareholder's Share of Income, Deductions, Credits, etc.","info"],
+  ["k1_1041","K-1","1041","Beneficiary's Share of Income, Deductions, Credits, etc.","info"],
+
+  // Business entity returns
+  ["f1065","1065",null,"U.S. Return of Partnership Income","biz"],
+  ["f1120","1120",null,"U.S. Corporation Income Tax Return","biz"],
+  ["f1120s","1120-S",null,"U.S. Income Tax Return for an S Corporation","biz"],
+  ["f1125a","1125-A",null,"Cost of Goods Sold","biz"],
+  ["f1125e","1125-E",null,"Compensation of Officers","biz"],
+  ["f8825","8825",null,"Rental Real Estate Income and Expenses of a Partnership or an S Corporation","biz"],
+  ["sD1065","D","1065","Capital Gains and Losses","biz"],
+  ["sD1120","D","1120","Capital Gains and Losses","biz"],
+  ["sD1120s","D","1120-S","Capital Gains and Losses and Built-in Gains","biz"],
+  ["f1120w","1120-W",null,"Estimated Tax for Corporations","biz"],
+  ["f2220","2220",null,"Underpayment of Estimated Tax by Corporations","biz"],
+  ["f4626","4626",null,"Alternative Minimum Tax—Corporations","biz"],
+
+  // Payroll
+  ["w4","W-4",null,"Employee's Withholding Certificate","pay"],
+  ["w3","W-3",null,"Transmittal of Wage and Tax Statements","pay"],
+  ["f941","941",null,"Employer's Quarterly Federal Tax Return","pay"],
+  ["sB941","B","941","Report of Tax Liability for Semiweekly Schedule Depositors","pay"],
+  ["f941x","941-X",null,"Adjusted Employer's Quarterly Federal Tax Return or Claim for Refund","pay"],
+  ["f944","944",null,"Employer's Annual Federal Tax Return","pay"],
+  ["f943","943",null,"Employer's Annual Federal Tax Return for Agricultural Employees","pay"],
+  ["f940","940",null,"Employer's Annual Federal Unemployment (FUTA) Tax Return","pay"],
+  ["sA940","A","940","Multi-State Employer and Credit Reduction Information","pay"],
+  ["f8974","8974",null,"Qualified Small Business Payroll Tax Credit for Increasing Research Activities","pay"],
+  ["f8027","8027",null,"Employer's Annual Information Return of Tip Income and Allocated Tips","pay"],
+  ["f1094c","1094-C",null,"Transmittal of Employer-Provided Health Insurance Offer and Coverage Information Returns","pay"],
+
+  // International
+  ["f1040nr","1040-NR",null,"U.S. Nonresident Alien Income Tax Return","intl"],
+  ["f1116","1116",null,"Foreign Tax Credit (Individual, Estate, or Trust)","intl"],
+  ["f1118","1118",null,"Foreign Tax Credit—Corporations","intl"],
+  ["f2555","2555",null,"Foreign Earned Income","intl"],
+  ["f4563","4563",null,"Exclusion of Income for Bona Fide Residents of American Samoa","intl"],
+  ["f8938","8938",null,"Statement of Specified Foreign Financial Assets","intl"],
+  ["f5471","5471",null,"Information Return of U.S. Persons With Respect to Certain Foreign Corporations","intl"],
+  ["f5472","5472",null,"Information Return of a 25% Foreign-Owned U.S. Corporation or a Foreign Corporation Engaged in a U.S. Trade or Business","intl"],
+  ["f8865","8865",null,"Return of U.S. Persons With Respect to Certain Foreign Partnerships","intl"],
+  ["f8858","8858",null,"Information Return of U.S. Persons With Respect to Foreign Disregarded Entities and Foreign Branches","intl"],
+  ["f8621","8621",null,"Information Return by a Shareholder of a Passive Foreign Investment Company","intl"],
+  ["f3520","3520",null,"Annual Return To Report Transactions With Foreign Trusts and Receipt of Certain Foreign Gifts","intl"],
+  ["f8833","8833",null,"Treaty-Based Return Position Disclosure","intl"],
+  ["w8ben","W-8BEN",null,"Certificate of Foreign Status of Beneficial Owner for U.S. Tax Withholding and Reporting (Individuals)","intl"],
+  ["f1042s","1042-S",null,"Foreign Person's U.S. Source Income Subject to Withholding","intl"],
+  ["f1042","1042",null,"Annual Withholding Tax Return for U.S. Source Income of Foreign Persons","intl"],
+  ["k2_1065","K-2","1065","Partners' Distributive Share Items—International","intl"],
+  ["k3_1065","K-3","1065","Partner's Share of Income, Deductions, Credits, etc.—International","intl"],
+
+  // Estates, trusts, gifts, exempt organizations
+  ["f1041","1041",null,"U.S. Income Tax Return for Estates and Trusts","est"],
+  ["f706","706",null,"United States Estate (and Generation-Skipping Transfer) Tax Return","est"],
+  ["f709","709",null,"United States Gift (and Generation-Skipping Transfer) Tax Return","est"],
+  ["f712","712",null,"Life Insurance Statement","est"],
+  ["f8971","8971",null,"Information Regarding Beneficiaries Acquiring Property From a Decedent","est"],
+  ["sA8971","A","8971","Information Regarding Beneficiaries Acquiring Property From a Decedent (statement to each beneficiary)","est"],
+  ["f4768","4768",null,"Application for Extension of Time To File a Return and/or Pay U.S. Estate Taxes","est"],
+  ["f990","990",null,"Return of Organization Exempt From Income Tax","est"],
+  ["f990ez","990-EZ",null,"Short Form Return of Organization Exempt From Income Tax","est"],
+  ["f990pf","990-PF",null,"Return of Private Foundation","est"],
+  ["f990t","990-T",null,"Exempt Organization Business Income Tax Return","est"],
+  ["sA990","A","990","Public Charity Status and Public Support","est"],
+  ["sB990","B","990","Schedule of Contributors","est"],
+  ["f1023","1023",null,"Application for Recognition of Exemption Under Section 501(c)(3)","est"],
+  ["f8868","8868",null,"Application for Extension of Time To File an Exempt Organization Return","est"],
+  ["f8282","8282",null,"Donee Information Return","est"],
+
+  // Filing and procedural
+  ["w9","W-9",null,"Request for Taxpayer Identification Number and Certification","adm"],
+  ["w7","W-7",null,"Application for IRS Individual Taxpayer Identification Number","adm"],
+  ["ss4","SS-4",null,"Application for Employer Identification Number","adm"],
+  ["f2848","2848",null,"Power of Attorney and Declaration of Representative","adm"],
+  ["f8821","8821",null,"Tax Information Authorization","adm"],
+  ["f4506t","4506-T",null,"Request for Transcript of Tax Return","adm"],
+  ["f8879","8879",null,"IRS e-file Signature Authorization","adm"],
+  ["f9465","9465",null,"Installment Agreement Request","adm"],
+  ["f1040x","1040-X",null,"Amended U.S. Individual Income Tax Return","adm"],
+  ["f1040es","1040-ES",null,"Estimated Tax for Individuals","adm"],
+  ["f4868","4868",null,"Application for Automatic Extension of Time To File U.S. Individual Income Tax Return","adm"],
+  ["f7004","7004",null,"Application for Automatic Extension of Time To File Certain Business Income Tax, Information, and Other Returns","adm"],
+  ["f2553","2553",null,"Election by a Small Business Corporation","adm"],
+  ["f8832","8832",null,"Entity Classification Election","adm"],
+  ["f1096","1096",null,"Annual Summary and Transmittal of U.S. Information Returns","adm"],
+  ["f4547","4547",null,"Trump Account Election(s)","adm"]
+];
+
+// [from, to, what carries over]; a 4th value "p" marks a filing link where no amount carries.
+const EDGES = [
+  // Wages and withholding
+  ["w4","w2","Sets the federal income tax withheld in box 2","p"],
+  ["w2","f1040","Box 1 wages → line 1a; box 2 withholding → line 25a"],
+  ["w2","f2441","Box 10 dependent care benefits → Part III"],
+  ["w2","f8959","Box 5 Medicare wages → Part I"],
+  ["w2","f8889","Box 12 code W employer HSA contributions"],
+  ["w2","s1a","Qualified tips and overtime → Parts II–III"],
+  ["w2","w3","Copy A totals summarized on W-3","p"],
+  ["sH","w2","Household employer issues W-2 to the employee","p"],
+  ["f8027","w2","Allocated tips appear in W-2 box 8","p"],
+  ["w2g","s1","Gambling winnings → line 8b"],
+  ["w2g","f1040","Box 4 withholding → line 25c"],
+  ["f4137","f1040","Unreported tips → line 1c"],
+  ["f4137","s2","Social security and Medicare tax → line 5"],
+  ["f4137","s1a","Qualified tips → line 4b"],
+  ["f8919","f1040","Uncollected-tax wages → line 1g"],
+  ["f8919","s2","Social security and Medicare tax → line 6"],
+
+  // Investment income
+  ["i1099int","sB","Interest → Part I"],
+  ["i1099int","s1","Box 2 early-withdrawal penalty → line 18"],
+  ["i1099int","f1116","Box 6 foreign tax paid"],
+  ["i1099oid","sB","Original issue discount → Part I"],
+  ["i1099div","sB","Box 1a ordinary dividends → Part II"],
+  ["i1099div","sD","Box 2a capital gain distributions → line 13"],
+  ["i1099div","f8995","Box 5 section 199A dividends"],
+  ["i1099div","f1116","Box 7 foreign tax paid"],
+  ["f8815","sB","Excludable savings bond interest → line 3"],
+  ["sB","f1040","Taxable interest → line 2b; ordinary dividends → line 3b"],
+  ["sB","f8960","Interest and dividends as investment income"],
+  ["i1099b","f8949","Each sale → Part I (short-term) or Part II (long-term)"],
+  ["i1099da","f8949","Digital asset sales → Part I or II"],
+  ["i1099s","f8949","Sale of a home or investment real estate"],
+  ["i1099s","f4797","Sale of business real property"],
+  ["f8949","sD","Totals → lines 1b–3 and 8b–10"],
+  ["f8949","sD1065","Partnership sales detail"],
+  ["f8949","sD1120","Corporate sales detail"],
+  ["f8949","sD1120s","S corporation sales detail"],
+  ["f2439","sD","Undistributed long-term gain → line 11"],
+  ["f2439","s3","Tax paid by the fund → line 13a"],
+  ["f6781","sD","Section 1256 gains, split 60% long / 40% short"],
+  ["f6252","sD","Installment gain on capital assets"],
+  ["f6252","f4797","Installment gain on business property"],
+  ["f8824","sD","Recognized gain on capital assets"],
+  ["f8824","f4797","Recognized gain on business property"],
+  ["f4684","sA","Personal casualty loss (federally declared disaster) → line 15"],
+  ["f4684","sD","Net personal casualty gain"],
+  ["f4684","f4797","Business casualty gains and losses"],
+  ["f4797","sD","Net section 1231 gain → line 11"],
+  ["f4797","s1","Ordinary gain or loss → line 4"],
+  ["sD","f1040","Net capital gain or loss → line 7"],
+  ["sD","f8960","Capital gains as investment income"],
+  ["f4952","sA","Deductible investment interest → line 9"],
+
+  // Business and self-employment income
+  ["i1099nec","sC","Box 1 nonemployee compensation → gross receipts"],
+  ["i1099nec","s1a","Qualified overtime or tips reported on 1099-NEC"],
+  ["i1099k","sC","Payment card and app payments → gross receipts"],
+  ["i1099misc","sE","Rents and royalties (boxes 1–2)"],
+  ["i1099misc","s1","Other income (box 3) → line 8z"],
+  ["i1099patr","sF","Patronage dividends → farm income"],
+  ["i1099patr","sC","Patronage dividends from business purchases"],
+  ["f4562","sC","Depreciation → line 13"],
+  ["f4562","sE","Depreciation → line 18"],
+  ["f4562","sF","Depreciation → line 14"],
+  ["f4562","f2106","Vehicle depreciation"],
+  ["f4562","f8825","Rental property depreciation"],
+  ["f4562","f1065","Depreciation deduction"],
+  ["f4562","f1120","Depreciation deduction"],
+  ["f4562","f1120s","Depreciation deduction"],
+  ["f8829","sC","Business use of home → line 30"],
+  ["f6198","sC","Loss allowed under at-risk rules"],
+  ["f6198","sE","Loss allowed under at-risk rules"],
+  ["f6198","sF","Loss allowed under at-risk rules"],
+  ["f8582","sE","Allowed passive losses"],
+  ["f7203","sE","Documents basis that allows S corporation losses","p"],
+  ["sC","s1","Net profit or loss → line 3"],
+  ["sC","sSE","Net earnings from self-employment"],
+  ["sC","f8995","Qualified business income"],
+  ["sC","f7206","Business profit caps the deduction"],
+  ["sF","s1","Net farm profit or loss → line 6"],
+  ["sF","sSE","Net farm earnings"],
+  ["sF","sJ","Elected farm income"],
+  ["sF","f8995","Qualified business income"],
+  ["sE","s1","Total supplemental income → line 5"],
+  ["sE","f8960","Rental and passive income"],
+  ["sE","f8995","Qualified business income"],
+  ["sSE","s2","Self-employment tax → line 4"],
+  ["sSE","s1","Deductible half of SE tax → line 15"],
+  ["sSE","f8959","Self-employment income for Additional Medicare Tax"],
+  ["f8995","f1040","QBI deduction → line 13a"],
+  ["f8995a","f1040","QBI deduction → line 13a"],
+
+  // Pass-through K-1s
+  ["f1065","k1_1065","Each partner's distributive share"],
+  ["f1065","k2_1065","Partnership-level international items"],
+  ["f1065","k3_1065","Each partner's international items"],
+  ["k2_1065","k3_1065","Partnership totals allocated to each partner","p"],
+  ["k1_1065","sE","Ordinary business and rental income → Part II"],
+  ["k1_1065","sB","Interest and dividends"],
+  ["k1_1065","sD","Capital gains"],
+  ["k1_1065","sSE","Box 14 self-employment earnings"],
+  ["k1_1065","f8995","Section 199A information"],
+  ["k1_1065","f8582","Passive activity items"],
+  ["k1_1065","f1120","Corporate partner's share of partnership income"],
+  ["k3_1065","f1116","Foreign-source income and foreign taxes"],
+  ["f1120s","k1_1120s","Each shareholder's pro rata share"],
+  ["k1_1120s","sE","Ordinary business income → Part II"],
+  ["k1_1120s","sD","Capital gains"],
+  ["k1_1120s","f8995","Section 199A information"],
+  ["k1_1120s","f7203","Losses and distributions tested against basis"],
+  ["k1_1120s","f8582","Passive activity items"],
+  ["f1041","k1_1041","Each beneficiary's share"],
+  ["k1_1041","sE","Estate and trust income → Part III"],
+  ["k1_1041","sB","Interest and dividends"],
+  ["k1_1041","sD","Capital gains"],
+
+  // Retirement, health, other income
+  ["i1099r","f1040","Distributions → lines 4a–5b; box 4 withholding → line 25b"],
+  ["i1099r","f8606","IRA distributions and Roth conversions"],
+  ["i1099r","f5329","Early distributions (code 1)"],
+  ["i1099r","f4972","Qualifying lump-sum distributions"],
+  ["i5498","f8606","Year-end IRA value for basis calculation"],
+  ["i5498","f5329","Excess contributions"],
+  ["f8606","f1040","Taxable IRA amount → line 4b"],
+  ["f5329","s2","Additional tax on IRAs and plans → line 8"],
+  ["f4972","f1040","Tax on lump sum → line 16"],
+  ["ssa1099","f1040","Box 5 net benefits → lines 6a–6b"],
+  ["i1099g","s1","Unemployment → line 7; state refunds → line 1"],
+  ["i1099c","s1","Canceled debt → line 8c"],
+  ["i1099c","f982","Excludable canceled debt"],
+  ["f982","s1","Excludes canceled debt otherwise reported on line 8c","p"],
+  ["i1099q","s1","Taxable 529 or ESA earnings → line 8z"],
+  ["i1099q","f8863","Tax-free 529 payments reduce qualified expenses","p"],
+  ["i1099sa","f8889","HSA distributions → Part II"],
+  ["i1099sa","f8853","Archer MSA distributions"],
+  ["i1099ltc","f8853","Long-term care payments → Section C"],
+  ["i5498sa","f8889","HSA contributions"],
+  ["f8889","s1","HSA deduction → line 13"],
+  ["f8889","s2","Additional 20% tax on HSA distributions"],
+  ["f8853","s1","Archer MSA deduction → line 23"],
+  ["f8853","s2","Additional tax on MSA distributions"],
+  ["i1095a","f8962","Monthly premiums, benchmark plan, advance credit"],
+  ["i1095c","f8962","An affordable employer offer can bar the credit","p"],
+  ["i1095c","f1094c","Employer transmits all 1095-Cs with 1094-C","p"],
+  ["f8962","s2","Excess advance credit repayment → line 1a"],
+  ["f8962","s3","Net premium tax credit → line 9"],
+
+  // Deductions and adjustments
+  ["i1098","sA","Mortgage interest → line 8a"],
+  ["i1098e","s1","Student loan interest → line 21"],
+  ["i1098c","f8283","Donated vehicle, boat, or airplane"],
+  ["f8283","sA","Noncash gifts → line 12"],
+  ["f8282","f8283","Donee reports a sale within 3 years of a gift","p"],
+  ["f2106","s1","Reservists, performing artists, fee-basis officials → line 12"],
+  ["f3903","s1","Armed Forces moving expenses → line 14"],
+  ["f7206","s1","Self-employed health insurance → line 17"],
+  ["f8814","s1","Child's income → line 8z"],
+  ["f8814","f1040","Tax on child's income → line 16"],
+  ["f8615","f1040","Kiddie tax → line 16"],
+  ["sJ","f1040","Averaged tax → line 16"],
+  ["s1","f1040","Additional income → line 8; adjustments → line 10"],
+  ["s1a","f1040","Total additional deductions → line 13b"],
+  ["s1a","f1040nr","Total additional deductions → line 13c"],
+  ["sA","f1040","Itemized deductions → line 12 (instead of standard deduction)"],
+  ["f2555","s1","Foreign earned income exclusion → line 8d (negative)"],
+  ["f2555","s1a","Excluded income added back for MAGI → lines 2b–2c"],
+  ["f4563","s1a","Excluded income added back for MAGI → line 2d"],
+
+  // Taxes
+  ["f8960","s2","Net investment income tax → line 12"],
+  ["f8959","s2","Additional Medicare Tax → line 11"],
+  ["f8959","f1040","Additional Medicare withholding → line 25c"],
+  ["f6251","s2","Alternative minimum tax → line 2"],
+  ["f6251","f8801","Prior-year AMT creates the credit","p"],
+  ["sH","s2","Household employment taxes → line 9"],
+  ["s2","f1040","Line 3 → line 17; line 21 → line 23"],
+
+  // Credits and payments
+  ["f1116","s3","Foreign tax credit → line 1"],
+  ["f2441","s3","Child and dependent care credit → line 2"],
+  ["f2441","f1040","Taxable dependent care benefits → line 1e"],
+  ["i1098t","f8863","Tuition and qualified expenses"],
+  ["f8863","s3","Lifetime learning / nonrefundable AOTC → line 3"],
+  ["f8863","f1040","Refundable American opportunity credit → line 29"],
+  ["f8880","s3","Saver's credit → line 4"],
+  ["f5695","s3","Residential energy credits → line 5"],
+  ["f8801","s3","Prior-year minimum tax credit → line 6b"],
+  ["f8839","s3","Adoption credit → line 6c"],
+  ["f8839","f1040","Excluded employer adoption benefits → line 1f"],
+  ["sR","s3","Elderly or disabled credit → line 6d"],
+  ["f8936","s3","Personal-use clean vehicle credit"],
+  ["f8936","f3800","Business-use clean vehicle credit"],
+  ["f8911","s3","Personal-use refueling property credit"],
+  ["f8911","f3800","Business-use refueling property credit"],
+  ["f6765","f3800","Research credit"],
+  ["f6765","f8974","Payroll tax election for qualified small businesses"],
+  ["f5884","f3800","Work opportunity credit"],
+  ["f8846","f3800","Employer credit for FICA on tips"],
+  ["f8826","f3800","Disabled access credit"],
+  ["f8941","f3800","Small employer health insurance credit"],
+  ["f8994","f3800","Paid family and medical leave credit"],
+  ["f3800","s3","General business credit → line 6a"],
+  ["f3800","f1120","General business credit → Schedule J"],
+  ["f4136","s3","Fuel tax credit → line 12"],
+  ["f4136","f1120","Fuel tax credit"],
+  ["f4868","s3","Amount paid with extension → line 10"],
+  ["f4868","f1040","Extends the time to file, not to pay","p"],
+  ["s8812","f1040","Child tax credit → line 19; additional CTC → line 28"],
+  ["sEIC","f1040","Qualifying-child details support the EIC (line 27a)"],
+  ["s3","f1040","Line 8 → line 20; line 15 → line 31"],
+  ["f1040es","f1040","Estimated payments → line 26"],
+  ["f1040es","f2210","Payment dates and amounts for the penalty"],
+  ["f2210","f1040","Estimated tax penalty → line 38"],
+
+  // International
+  ["f1116","f1040","Attach when claiming the foreign tax credit","p"],
+  ["f8938","f1040","Attach when foreign assets exceed the thresholds","p"],
+  ["f3520","f1040","Filed separately, due with the income tax return","p"],
+  ["f5471","f1040","Attach to a U.S. shareholder's return","p"],
+  ["f5471","f1120","Attach to a U.S. shareholder's return","p"],
+  ["f8865","f1040","Attach to a U.S. partner's return","p"],
+  ["f8865","f1120","Attach to a U.S. partner's return","p"],
+  ["f8858","f1040","Attach to the owner's return","p"],
+  ["f8858","f1120","Attach to the owner's return","p"],
+  ["f5472","f1120","Attach to the reporting corporation's return","p"],
+  ["f8621","f1040","PFIC income and elections reported with the return","p"],
+  ["f8833","f1040","Disclose a treaty-based position","p"],
+  ["f8833","f1040nr","Disclose a treaty-based position","p"],
+  ["w8ben","f1042s","Establishes the treaty rate shown on 1042-S","p"],
+  ["f1042s","f1040nr","U.S.-source income and tax withheld"],
+  ["f1042s","f1042","Withholding agent's totals","p"],
+  ["f1118","f1120","Foreign tax credit → Schedule J"],
+
+  // Business entities
+  ["f1125a","f1065","Cost of goods sold → line 2"],
+  ["f1125a","f1120","Cost of goods sold → line 2"],
+  ["f1125a","f1120s","Cost of goods sold → line 2"],
+  ["f1125e","f1120","Officer compensation → line 12"],
+  ["f1125e","f1120s","Officer compensation → line 7"],
+  ["f8825","f1065","Net rental real estate income → Schedule K"],
+  ["f8825","f1120s","Net rental real estate income → Schedule K"],
+  ["sD1065","f1065","Capital gains → Schedule K"],
+  ["sD1120","f1120","Capital gain net income → line 8"],
+  ["sD1120s","f1120s","Capital gains → Schedule K; built-in gains tax"],
+  ["f4797","f1065","Ordinary gain or loss → line 6"],
+  ["f4797","f1120","Net gain or loss → line 9"],
+  ["f4797","f1120s","Net gain or loss → line 4"],
+  ["f2220","f1120","Estimated tax penalty → line 34"],
+  ["f1120w","f1120","Worksheet for the estimated payments credited on the return","p"],
+  ["f4626","f1120","Corporate alternative minimum tax → Schedule J"],
+  ["f1120","i1099div","Corporation reports dividends it pays","p"],
+  ["f2553","f1120s","S election must be in effect","p"],
+  ["f8832","f1120","Elect to be taxed as a corporation","p"],
+  ["f8832","f1065","Elect or confirm partnership classification","p"],
+  ["f7004","f1065","Automatic extension","p"],
+  ["f7004","f1120","Automatic extension","p"],
+  ["f7004","f1120s","Automatic extension","p"],
+  ["f7004","f1041","Automatic extension","p"],
+
+  // Payroll
+  ["sB941","f941","Daily tax liability for semiweekly depositors"],
+  ["f8974","f941","Payroll research credit → line 11a"],
+  ["f941","w3","Four quarterly 941s reconcile to W-3 totals","p"],
+  ["f941","f941x","Corrects a previously filed 941","p"],
+  ["f944","w3","Annual return reconciles to W-3 totals","p"],
+  ["f943","w3","Annual return reconciles to W-3 totals","p"],
+  ["sA940","f940","Multi-state and credit reduction amounts → lines 9–11"],
+
+  // Estates, gifts, exempt orgs
+  ["f709","f706","Adjusted taxable gifts → Part 2"],
+  ["f712","f706","Policy values for life insurance on the decedent"],
+  ["f712","f709","Value of a gifted life insurance policy"],
+  ["f4768","f706","Extension to file or pay","p"],
+  ["f706","f8971","Basis reporting required after filing 706","p"],
+  ["f8971","sA8971","Statement furnished to each beneficiary","p"],
+  ["sA8971","f8949","Reported estate value sets the beneficiary's basis"],
+  ["sA990","f990","Public charity status and support test"],
+  ["sA990","f990ez","Public charity status and support test"],
+  ["sB990","f990","Contributor details"],
+  ["sB990","f990ez","Contributor details"],
+  ["sB990","f990pf","Contributor details"],
+  ["f1023","f990","Recognition of exemption comes before annual filing","p"],
+  ["f8868","f990","Automatic extension","p"],
+  ["f8868","f990pf","Automatic extension","p"],
+  ["f8868","f990t","Automatic extension","p"],
+  ["f990","f990t","$1,000+ gross unrelated business income requires 990-T","p"],
+
+  // Procedural
+  ["w9","i1099nec","Supplies the payee TIN","p"],
+  ["w9","i1099misc","Supplies the payee TIN","p"],
+  ["w9","i1099int","Supplies the payee TIN","p"],
+  ["w9","i1099b","Supplies the payee TIN","p"],
+  ["i1099nec","f1096","Paper Copy A filed with 1096","p"],
+  ["i1099misc","f1096","Paper Copy A filed with 1096","p"],
+  ["i1099int","f1096","Paper Copy A filed with 1096","p"],
+  ["i1098","f1096","Paper Copy A filed with 1096","p"],
+  ["ss4","f941","EIN required to file","p"],
+  ["ss4","f1065","EIN required to file","p"],
+  ["ss4","f1120","EIN required to file","p"],
+  ["ss4","f1120s","EIN required to file","p"],
+  ["ss4","f1041","EIN required to file","p"],
+  ["w7","f1040","ITIN for filers without a Social Security number","p"],
+  ["w7","f1040nr","ITIN for filers without a Social Security number","p"],
+  ["f2848","f1040","Authorizes a representative for the return","p"],
+  ["f8821","f1040","Authorizes access to return information","p"],
+  ["f4506t","f1040","Transcript of a filed return","p"],
+  ["f8879","f1040","Taxpayer's signature for an e-filed return","p"],
+  ["f4547","f1040","Election for a child's Trump account","p"],
+  ["f1040sr","f1040","Same lines and schedules, larger print for filers 65+","p"],
+  ["f1040","f9465","Installment plan for a balance due","p"],
+  ["f1040","f1040x","Amends a filed return","p"]
+];
+
+function buildGraph(nodes, edges){
+  const byId = new Map(nodes.map(n => [n[0], {id:n[0], num:n[1], parent:n[2], title:n[3], cat:n[4]}]));
+  const E = edges.map((e,i) => ({i, s:e[0], t:e[1], note:e[2], p:e[3]==="p"}));
+  const out = new Map(), inn = new Map();
+  for (const id of byId.keys()){ out.set(id,[]); inn.set(id,[]); }
+  for (const e of E){ out.get(e.s).push(e); inn.get(e.t).push(e); }
+  return {byId, E, out, inn};
+}
+
+// Layered left-to-right layout: longest path, pulled right toward consumers, then barycenter ordering.
+function layoutGraph(ids, edges, opts){
+  const W = opts.W, H = opts.H, GX = opts.GX, GY = opts.GY;
+  const set = new Set(ids);
+  const es = edges.filter(e => set.has(e.s) && set.has(e.t));
+  const succ = new Map(), pred = new Map(), indeg = new Map();
+  for (const id of ids){ succ.set(id,[]); pred.set(id,[]); indeg.set(id,0); }
+  for (const e of es){ succ.get(e.s).push(e.t); pred.get(e.t).push(e.s); indeg.set(e.t, indeg.get(e.t)+1); }
+  const order = [], q = ids.filter(id => indeg.get(id)===0);
+  while (q.length){ const id = q.shift(); order.push(id); for (const t of succ.get(id)){ indeg.set(t, indeg.get(t)-1); if (indeg.get(t)===0) q.push(t); } }
+  if (order.length !== ids.length) throw new Error("cycle in graph");
+  const rank = new Map();
+  for (const id of order){ let r = 0; for (const p of pred.get(id)) r = Math.max(r, rank.get(p)+1); rank.set(id, r); }
+  for (let i = order.length-1; i >= 0; i--){ const id = order[i]; const ss = succ.get(id); if (ss.length){ let m = Infinity; for (const t of ss) m = Math.min(m, rank.get(t)); rank.set(id, m-1); } }
+  let minR = Infinity; for (const r of rank.values()) minR = Math.min(minR, r);
+  const cols = [];
+  for (const id of ids){ const r = rank.get(id)-minR; rank.set(id, r); (cols[r] ||= []).push(id); }
+  for (let c = 0; c < cols.length; c++) cols[c] ||= [];
+  const catIx = id => CAT_ORDER.indexOf(opts.cat(id));
+  for (const col of cols) col.sort((a,b) => catIx(a)-catIx(b) || a.localeCompare(b, undefined, {numeric:true}));
+  const pos = new Map();
+  const setPos = () => { for (const col of cols) col.forEach((id,i) => pos.set(id, (i+0.5)/col.length)); };
+  setPos();
+  for (let it = 0; it < 6; it++){
+    const forward = it % 2 === 0;
+    const range = forward ? [...cols.keys()] : [...cols.keys()].reverse();
+    for (const c of range){
+      const col = cols[c];
+      const bary = new Map(col.map(id => {
+        const nb = forward ? pred.get(id) : succ.get(id);
+        if (!nb.length) return [id, pos.get(id)];
+        return [id, nb.reduce((a,n) => a + pos.get(n), 0)/nb.length];
+      }));
+      col.sort((a,b) => bary.get(a)-bary.get(b));
+      col.forEach((id,i) => pos.set(id, (i+0.5)/col.length));
+    }
+  }
+  const maxLen = Math.max(1, ...cols.map(c => c.length));
+  const xy = new Map();
+  cols.forEach((col,c) => {
+    const off = (maxLen - col.length) * (H+GY) / 2;
+    col.forEach((id,i) => xy.set(id, {x: c*(W+GX), y: off + i*(H+GY)}));
+  });
+  return {xy, es, cols, width: cols.length*(W+GX)-GX, height: maxLen*(H+GY)-GY};
+}
+/*ENDPURE*/
+
+const G = buildGraph(NODES, EDGES);
+const DIM = {W:214, H:42, GX:96, GY:12};
+const TAB = 72;
+
+const state = {
+  sel: "sC",
+  mode: "full",
+  focus: true,
+  cats: Object.fromEntries(CAT_ORDER.map(c => [c, true])),
+  view: {k:1, tx:0, ty:0},
+  L: null
+};
+try { const saved = JSON.parse(localStorage.getItem("irsmap.cats")||"null"); if (saved) Object.assign(state.cats, saved); } catch(e){}
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const label = n => n.parent ? `Schedule ${n.num} (${n.parent})` : (n.id==="ssa1099" ? "Form SSA-1099" : `Form ${n.num}`);
+const kindText = n => n.parent ? `SCH · ${n.parent}` : "FORM";
+const findUrl = n => "https://www.irs.gov/forms-instructions-and-publications?find=" + encodeURIComponent(n.parent ? `${n.parent} (Schedule ${n.num})` : n.num);
+
+function related(id, mode){
+  const up = new Set(), down = new Set();
+  if (!id) return {up, down};
+  if (mode === "direct"){
+    for (const e of G.inn.get(id)) up.add(e.s);
+    for (const e of G.out.get(id)) down.add(e.t);
+  } else {
+    const walk = (start, adj, key, acc) => { const st = [start]; while (st.length){ const x = st.pop(); for (const e of adj.get(x)){ const y = e[key]; if (!acc.has(y)){ acc.add(y); st.push(y); } } } };
+    walk(id, G.inn, "s", up); walk(id, G.out, "t", down);
+  }
+  up.delete(id); down.delete(id);
+  return {up, down};
+}
+
+function visibleIds(){
+  let ids = NODES.map(n => n[0]).filter(id => state.cats[G.byId.get(id).cat]);
+  if (state.focus && state.sel){
+    const {up, down} = related(state.sel, state.mode);
+    ids = ids.filter(id => id === state.sel || up.has(id) || down.has(id));
+    if (!ids.includes(state.sel)) ids.push(state.sel);
+  }
+  return ids;
+}
+
+function wrapTitle(t, n){
+  const words = t.split(/\s+/), lines = [""];
+  let over = false;
+  for (const w of words){
+    const cur = lines[lines.length-1];
+    const next = cur ? cur + " " + w : w;
+    if (next.length <= n) lines[lines.length-1] = next;
+    else if (lines.length < 2) lines.push(w);
+    else { over = true; break; }
+  }
+  return lines.map((l,i) => {
+    if (l.length > n) return l.slice(0, n-1) + "…";
+    if (i === lines.length-1 && over) return (l.length > n-1 ? l.slice(0, n-1) : l) + "…";
+    return l;
+  });
+}
+
+function render(fit){
+  const ids = visibleIds();
+  $("#emptyMap").hidden = ids.length > 0;
+  const L = layoutGraph(ids, G.E, {...DIM, cat: id => G.byId.get(id).cat});
+  state.L = L;
+  const {W,H} = DIM;
+  let s = "";
+  for (const e of L.es){
+    const a = L.xy.get(e.s), b = L.xy.get(e.t);
+    const x1 = a.x + W, y1 = a.y + H/2, x2 = b.x - 3, y2 = b.y + H/2;
+    const dx = Math.max(40, (x2-x1)*0.45);
+    s += `<path class="edge${e.p?" p":""}" data-i="${e.i}" d="M${x1} ${y1}C${x1+dx} ${y1} ${x2-dx} ${y2} ${x2} ${y2}"><title>${esc(label(G.byId.get(e.s)))} → ${esc(label(G.byId.get(e.t)))}: ${esc(e.note)}</title></path>`;
+  }
+  for (const id of ids){
+    const n = G.byId.get(id), p = L.xy.get(id);
+    const lines = wrapTitle(n.title, 21);
+    const ty = lines.length === 1 ? H/2 + 4 : H/2 - 2;
+    s += `<g class="node cat-${n.cat}" data-id="${id}" tabindex="0" role="button" aria-label="${esc(label(n))}: ${esc(n.title)}" transform="translate(${p.x},${p.y})">`
+      + `<title>${esc(label(n))} — ${esc(n.title)}</title>`
+      + `<rect class="box" width="${W}" height="${H}" rx="4"></rect>`
+      + `<path class="tab" d="M4 0H${TAB}V${H}H4A4 4 0 0 1 0 ${H-4}V4A4 4 0 0 1 4 0Z"></path>`
+      + `<text class="kind" x="8" y="13">${esc(kindText(n))}</text>`
+      + `<text class="num" x="8" y="32">${esc(n.num)}</text>`
+      + lines.map((l,i) => `<text class="ttl" x="${TAB+9}" y="${ty + i*13}">${esc(l)}</text>`).join("")
+      + `</g>`;
+  }
+  $("#vp").innerHTML = s;
+  highlight();
+  if (fit) fitView();
+  $("#stats").textContent = `${NODES.length} forms · ${EDGES.length} links · showing ${ids.length}`;
+}
+
+function highlight(){
+  const svg = $("#svg");
+  const sel = state.sel;
+  svg.classList.toggle("has-sel", !!sel);
+  const {up, down} = related(sel, state.mode);
+  for (const g of svg.querySelectorAll(".node")){
+    const id = g.dataset.id;
+    g.classList.toggle("sel", id === sel);
+    g.classList.toggle("up", up.has(id));
+    g.classList.toggle("down", down.has(id));
+  }
+  for (const p of svg.querySelectorAll(".edge")){
+    const e = G.E[+p.dataset.i];
+    let isUp = false, isDown = false;
+    if (sel){
+      if (state.mode === "direct"){ isUp = e.t === sel; isDown = e.s === sel; }
+      else { isUp = up.has(e.s) && (e.t === sel || up.has(e.t)); isDown = down.has(e.t) && (e.s === sel || down.has(e.s)); }
+    }
+    p.classList.toggle("up", isUp);
+    p.classList.toggle("down", isDown);
+  }
+  // draw highlighted edges on top of dimmed ones
+  const vp = $("#vp"), firstNode = vp.querySelector(".node");
+  for (const p of vp.querySelectorAll(".edge.up,.edge.down")) vp.insertBefore(p, firstNode);
+  renderPanel();
+}
+
+function relList(items, dir){
+  if (!items.length) return `<p class="none">${dir==="in" ? "Nothing on this map feeds this form." : "This form doesn't carry to another form on this map."}</p>`;
+  return `<ul class="rel">` + items.map(e => {
+    const n = G.byId.get(dir === "in" ? e.s : e.t);
+    return `<li><button data-go="${n.id}"><span class="n"><i style="background:var(--c-${n.cat})"></i>${esc(label(n).replace(/^Form /,""))}</span><span class="t">${esc(n.title)}</span><span class="why${e.p?" p":""}">${esc(e.note)}</span></button></li>`;
+  }).join("") + `</ul>`;
+}
+
+function renderPanel(){
+  const P = $("#panel");
+  const n = state.sel && G.byId.get(state.sel);
+  if (!n){
+    P.innerHTML = `<div class="intro"><h2>How to read the map</h2>
+      <p>Each box is an IRS form or schedule. Arrows run the way amounts flow: from the statements you receive, through worksheets and schedules, into the return that gets filed.</p>
+      <p>Select a form to trace what feeds it (blue) and where its numbers go (red). Dashed arrows are filing links, such as an extension or an election, where no dollar amount carries over.</p>
+      <p>Start with one of these:</p></div>
+      <div class="picks">${["f1040","sC","w2","k1_1065","f8949","f941","f706","f990"].map(id => { const m = G.byId.get(id); return `<button class="pick" data-go="${id}"><b>${esc(m.parent ? "Sch. "+m.num : m.num)}</b>${m.parent ? " ("+esc(m.parent)+")" : ""}</button>`; }).join("")}</div>
+      ${sourceNote()}`;
+    return;
+  }
+  const ins = G.inn.get(n.id), outs = G.out.get(n.id);
+  const {up, down} = related(n.id, "full");
+  P.innerHTML = `
+    <div class="p-kind"><i style="background:var(--c-${n.cat})"></i>${esc(CATS[n.cat].label)}</div>
+    <div class="p-num">${esc(n.parent ? "Schedule " + n.num : n.num)}</div>
+    <h2 class="p-title">${n.parent ? `<span style="color:var(--muted);font-weight:500">Form ${esc(n.parent)} · </span>` : ""}${esc(n.title)}</h2>
+    <p class="p-note">${up.size} form${up.size===1?"":"s"} upstream · ${down.size} downstream across the full chain.</p>
+    <a class="link" href="${findUrl(n)}" target="_blank" rel="noopener">Find ${esc(label(n))} on IRS.gov ↗</a>
+    <div class="p-sec"><h3><em style="background:var(--accent)"></em>Flows into<span class="ct">${outs.length}</span></h3>${relList(outs,"out")}</div>
+    <div class="p-sec"><h3><em style="background:var(--up)"></em>Draws from<span class="ct">${ins.length}</span></h3>${relList(ins,"in")}</div>
+    ${sourceNote()}`;
+}
+function sourceNote(){
+  return `<div class="src"><p>Form list from irs.gov Forms &amp; Instructions, which lists 3,142 current products. This map covers the forms that pass amounts to one another; publications, translations and stand-alone notices are left out.</p><p>Line references follow the 2025 forms and their instructions. Check the current instructions before relying on a line number.</p></div>`;
+}
+
+function select(id, opts = {}){
+  state.sel = id;
+  if (state.focus) render(true); else highlight();
+  if (id && opts.center) centerOn(id);
+}
+
+/* pan & zoom */
+function applyView(){ const v = state.view; $("#vp").setAttribute("transform", `translate(${v.tx},${v.ty}) scale(${v.k})`); }
+function fitView(){
+  const L = state.L, m = $("#map").getBoundingClientRect();
+  if (!L || !m.width) return;
+  const pad = 40, padB = 90;
+  const k = Math.min((m.width - pad*2)/Math.max(L.width,1), (m.height - pad - padB)/Math.max(L.height,1), 1.1);
+  state.view = {k, tx: (m.width - L.width*k)/2, ty: pad + (m.height - pad - padB - L.height*k)/2};
+  applyView();
+}
+function zoomAt(px, py, f){
+  const v = state.view; const k = Math.min(3, Math.max(0.08, v.k*f)); const r = k/v.k;
+  v.tx = px - (px - v.tx)*r; v.ty = py - (py - v.ty)*r; v.k = k; applyView();
+}
+function centerOn(id){
+  const p = state.L && state.L.xy.get(id); if (!p) return;
+  const m = $("#map").getBoundingClientRect(); const v = state.view;
+  v.k = Math.max(v.k, 0.75);
+  v.tx = m.width/2 - (p.x + DIM.W/2)*v.k; v.ty = m.height/2 - (p.y + DIM.H/2)*v.k; applyView();
+}
+
+const mapEl = $("#map");
+const pointers = new Map();
+let drag = null, pinch = null;
+mapEl.addEventListener("pointerdown", e => {
+  if (e.target.closest(".zoom,.legend")) return;
+  mapEl.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (pointers.size === 1){
+    drag = {x:e.clientX, y:e.clientY, tx:state.view.tx, ty:state.view.ty, moved:0, target:e.target.closest(".node")};
+  } else if (pointers.size === 2){
+    const [a,b] = [...pointers.values()];
+    pinch = {d: Math.hypot(a.x-b.x, a.y-b.y)}; drag = null;
+  }
+});
+mapEl.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if (pinch && pointers.size === 2){
+    const [a,b] = [...pointers.values()]; const d = Math.hypot(a.x-b.x, a.y-b.y);
+    const r = mapEl.getBoundingClientRect();
+    zoomAt((a.x+b.x)/2 - r.left, (a.y+b.y)/2 - r.top, d/pinch.d); pinch.d = d;
+  } else if (drag){
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.moved = Math.max(drag.moved, Math.hypot(dx,dy));
+    if (drag.moved > 4){ mapEl.classList.add("drag"); state.view.tx = drag.tx + dx; state.view.ty = drag.ty + dy; applyView(); }
+  }
+});
+function endPointer(e){
+  if (!pointers.has(e.pointerId)) return;
+  pointers.delete(e.pointerId);
+  if (drag && drag.moved <= 4 && e.type === "pointerup"){
+    if (drag.target) select(drag.target.dataset.id);
+    else if (!state.focus) select(null);
+  }
+  if (pointers.size < 2) pinch = null;
+  if (pointers.size === 0){ drag = null; mapEl.classList.remove("drag"); }
+}
+mapEl.addEventListener("pointerup", endPointer);
+mapEl.addEventListener("pointercancel", endPointer);
+mapEl.addEventListener("wheel", e => {
+  e.preventDefault(); const r = mapEl.getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY*0.0016));
+}, {passive:false});
+$("#svg").addEventListener("keydown", e => {
+  const g = e.target.closest && e.target.closest(".node");
+  if (g && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); select(g.dataset.id); }
+});
+$("#zin").onclick = () => { const r = mapEl.getBoundingClientRect(); zoomAt(r.width/2, r.height/2, 1.25); };
+$("#zout").onclick = () => { const r = mapEl.getBoundingClientRect(); zoomAt(r.width/2, r.height/2, 0.8); };
+$("#zfit").onclick = fitView;
+
+/* panel links */
+$("#panel").addEventListener("click", e => {
+  const b = e.target.closest("[data-go]"); if (!b) return;
+  select(b.dataset.go, {center: !state.focus});
+});
+
+/* category chips */
+function renderChips(){
+  $("#chips").innerHTML = CAT_ORDER.map(c => `<button class="chip" data-cat="${c}" aria-pressed="${state.cats[c]}"><i style="background:var(--c-${c})"></i>${esc(CATS[c].label)}</button>`).join("");
+}
+$("#chips").addEventListener("click", e => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  const c = b.dataset.cat; state.cats[c] = !state.cats[c];
+  b.setAttribute("aria-pressed", state.cats[c]);
+  try { localStorage.setItem("irsmap.cats", JSON.stringify(state.cats)); } catch(err){}
+  render(true);
+});
+
+/* mode + focus */
+function setMode(m){
+  state.mode = m;
+  $("#m-direct").setAttribute("aria-pressed", m === "direct");
+  $("#m-full").setAttribute("aria-pressed", m === "full");
+  if (state.focus) render(true); else highlight();
+}
+$("#m-direct").onclick = () => setMode("direct");
+$("#m-full").onclick = () => setMode("full");
+$("#focus").onchange = e => { state.focus = e.target.checked; render(true); };
+
+/* search */
+const q = $("#q"), res = $("#results");
+let hits = [], hi = 0;
+function norm(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+const INDEX = [...G.byId.values()].map(n => ({n, key: norm(`${label(n)} ${n.num} ${n.parent ? "sch schedule "+n.num+" "+n.parent : ""} ${n.title}`)}));
+function search(){
+  const t = norm(q.value);
+  if (!t){ res.hidden = true; return; }
+  const terms = t.split(" ");
+  hits = INDEX.filter(x => terms.every(w => x.key.includes(w)))
+    .sort((a,b) => (norm(b.n.num) === t) - (norm(a.n.num) === t) || a.key.length - b.key.length).slice(0, 14).map(x => x.n);
+  hi = 0;
+  res.innerHTML = hits.length ? hits.map((n,i) => `<button data-id="${n.id}" class="${i===0?"on":""}"><span class="n">${esc(label(n).replace(/^Form /,""))}</span><span class="t">${esc(n.title)}</span></button>`).join("") : `<div style="padding:8px;color:var(--muted);font-size:13px">No form on the map matches “${esc(q.value)}”.</div>`;
+  res.hidden = false;
+}
+function pick(id){
+  res.hidden = true; q.value = ""; q.blur();
+  const n = G.byId.get(id);
+  if (!state.cats[n.cat]){ state.cats[n.cat] = true; renderChips(); }
+  select(id, {center: true});
+  if (!state.focus){ render(false); centerOn(id); }
+}
+q.addEventListener("input", search);
+q.addEventListener("keydown", e => {
+  if (res.hidden || !hits.length) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp"){
+    e.preventDefault(); hi = (hi + (e.key === "ArrowDown" ? 1 : hits.length-1)) % hits.length;
+    res.querySelectorAll("button").forEach((b,i) => b.classList.toggle("on", i === hi));
+  } else if (e.key === "Enter"){ e.preventDefault(); pick(hits[hi].id); }
+  else if (e.key === "Escape"){ res.hidden = true; }
+});
+res.addEventListener("click", e => { const b = e.target.closest("button[data-id]"); if (b) pick(b.dataset.id); });
+document.addEventListener("pointerdown", e => { if (!e.target.closest(".search")) res.hidden = true; });
+
+window.addEventListener("resize", () => fitView());
+renderChips();
+$("#focus").checked = state.focus;
+render(true);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitView());
+</script>
+</body>
+</html>
